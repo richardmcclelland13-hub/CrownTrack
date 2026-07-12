@@ -1,0 +1,4 @@
+interface:
+  display_name: "Location sharing security"
+  short_description: "Threat-model private rider location sharing"
+  default_prompt: "Use $location-sharing-security to audit consent, replay protection, retention, and deletion for CrewLink."

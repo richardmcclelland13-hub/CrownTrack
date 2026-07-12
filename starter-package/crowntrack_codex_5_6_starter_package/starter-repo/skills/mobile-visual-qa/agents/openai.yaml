@@ -1,0 +1,4 @@
+interface:
+  display_name: "Mobile visual QA"
+  short_description: "Inspect field-safe mobile layouts and states"
+  default_prompt: "Use $mobile-visual-qa to test CrownTrack UI states across phone and tablet viewports."

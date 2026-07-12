@@ -1,0 +1,4 @@
+interface:
+  display_name: "CrewLink transport"
+  short_description: "Design CrewLink protocol and transport adapters"
+  default_prompt: "Use $crewlink-transport to implement or review transport-neutral CrewLink messaging and simulators."

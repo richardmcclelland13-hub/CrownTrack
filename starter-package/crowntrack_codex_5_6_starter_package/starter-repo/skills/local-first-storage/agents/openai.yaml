@@ -1,0 +1,4 @@
+interface:
+  display_name: "Local-first storage"
+  short_description: "Build and audit local-first CrewLink storage"
+  default_prompt: "Use $local-first-storage to implement a migration-safe CrewLink repository and retention rules."

@@ -1,0 +1,7 @@
+node_modules
+.expo
+dist
+dist-baseline
+artifacts/stage-2-visual-qa
+coverage
+*.log

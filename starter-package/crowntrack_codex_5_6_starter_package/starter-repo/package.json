@@ -1,0 +1,35 @@
+{
+  "name": "crowntrack-adv",
+  "version": "0.1.0",
+  "private": true,
+  "description": "CrownTrack ADV native UI shell with mock data only.",
+  "workspaces": [
+    "apps/mobile",
+    "apps/relay",
+    "packages/core",
+    "packages/ui",
+    "packages/offline-packs",
+    "packages/gpx",
+    "packages/crew-protocol",
+    "packages/crewlink"
+  ],
+  "scripts": {
+    "start": "npm --workspace apps/mobile run start",
+    "android": "npm --workspace apps/mobile run android",
+    "ios": "npm --workspace apps/mobile run ios",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "test": "tsx --test tests/*.test.ts",
+    "test:relay": "npm --workspace apps/relay test",
+    "relay:start": "npm --workspace apps/relay start",
+    "export:android": "npm --workspace apps/mobile exec expo export -- --platform android --output-dir dist",
+    "web": "npm --workspace apps/mobile exec expo start -- --web",
+    "lint": "eslint . --ext .ts,.tsx --ignore-pattern node_modules"
+  },
+  "devDependencies": {
+    "@types/react": "~18.3.12",
+    "@typescript-eslint/parser": "^8.18.0",
+    "eslint": "^9.17.0",
+    "tsx": "^4.19.2",
+    "typescript": "~5.3.3"
+  }
+}

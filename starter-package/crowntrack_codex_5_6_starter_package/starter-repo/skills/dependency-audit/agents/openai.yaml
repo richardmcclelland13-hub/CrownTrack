@@ -1,0 +1,4 @@
+interface:
+  display_name: "Dependency audit"
+  short_description: "Classify dependency advisories without force fixes"
+  default_prompt: "Use $dependency-audit to classify CrownTrack dependency findings and safe remediation options."
