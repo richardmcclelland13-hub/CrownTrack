@@ -49,6 +49,24 @@ export const CREWLINK_MIGRATIONS: readonly CrewLinkMigration[] = [
       'CREATE INDEX crew_inbound_dedup_peer_idx ON crew_inbound_dedup(group_id, device_id)',
     ],
   },
+  {
+    version: 4,
+    name: 'secure_device_identity_and_pairing',
+    statements: [
+      'CREATE TABLE crew_identity (id INTEGER PRIMARY KEY CHECK (id = 1), device_id TEXT NOT NULL UNIQUE, display_name TEXT NOT NULL, public_key TEXT NOT NULL, fingerprint TEXT NOT NULL, created_at TEXT NOT NULL)',
+      'CREATE TABLE crew_trusted_peer (device_id TEXT PRIMARY KEY, display_name TEXT NOT NULL, public_key TEXT NOT NULL, fingerprint TEXT NOT NULL, trusted_at TEXT NOT NULL, revoked_at TEXT)',
+      'CREATE TABLE crew_pairing_invitation (invitation_id TEXT PRIMARY KEY, issuer_device_id TEXT NOT NULL, expires_at TEXT NOT NULL, cancelled_at TEXT, used_at TEXT)',
+      'CREATE INDEX crew_pairing_invitation_expiry_idx ON crew_pairing_invitation(expires_at)',
+    ],
+  },
+  {
+    version: 5,
+    name: 'staged_pairing_confirmation_boundary',
+    statements: [
+      "ALTER TABLE crew_pairing_invitation ADD COLUMN status TEXT NOT NULL DEFAULT 'staged'",
+      'ALTER TABLE crew_pairing_invitation ADD COLUMN payload_json TEXT',
+    ],
+  },
 ];
 
 export const LATEST_CREWLINK_SCHEMA_VERSION = CREWLINK_MIGRATIONS[CREWLINK_MIGRATIONS.length - 1]?.version ?? 0;

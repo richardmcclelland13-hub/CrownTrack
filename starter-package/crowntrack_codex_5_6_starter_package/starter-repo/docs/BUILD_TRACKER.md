@@ -4,14 +4,18 @@
 | --- | --- | --- |
 | 0/1 | Expo/React Native shell, five tabs, mock ride/offline states, pure domain helpers | Needs audit |
 | 2 | Local-first CrewLink protocol, persistence boundary, simulators, dev relay, Crew UI | Needs audit |
-| 2.1 | Canonical native persistence, migration runner, browser QA, Android/iOS boundary closure | Needs fixes |
-| 2.2 | Android native acceptance closure | Accepted |
-| 3 | Secure device identity, pairing, verified membership, and signed CrewLink | In progress |
+| 2.1 | Canonical native persistence and migration runner | Accepted through Stage 2.2 closure |
+| 2.2 | Android native persistence and deletion acceptance | Accepted |
+| 3A | Secure device identity and offline pairing | Accepted |
+| 3B | Verified membership and signed CrewLink messages | Not started |
+| 4A | MapLibre local-pack spike | Recommended next |
 
 ## Native build bookkeeping
 
 - `apps/mobile/android/` is local Expo prebuild output, not source-controlled. It may contain generated files and a debug keystore.
-- Native QA evidence, APKs, database snapshots, Metro/Gradle logs, and caches remain local and ignored.
+- APKs, database snapshots, Metro/Gradle logs, build caches, debug keystores, raw invitations, and secret-bearing screenshots remain untracked.
+- Redacted text evidence is stored under `artifacts/stage-3a-native-qa/`.
 - Use `npm --workspace apps/mobile run android` for native launch/build. On Windows, build through the short `X:` mapping with external Gradle caches when CMake path lengths require it.
+- Android Stage 3A runtime was tested. iOS Stage 3A runtime is unverified.
 
-`Needs audit` means implementation evidence exists but Richard/ChatGPT has not accepted the milestone. `Needs fixes` means one or more required acceptance gates are incomplete. Browser validation is supplemental to native validation.
+Stage 3A passed Android native acceptance and the independent final security/QA diff review.

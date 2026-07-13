@@ -1,0 +1,1 @@
+export class CrewIdentityError extends Error { constructor(readonly code: 'invalid_input' | 'invalid_signature' | 'expired' | 'cancelled' | 'replayed' | 'key_changed' | 'storage_unavailable', message: string) { super(message); this.name = 'CrewIdentityError'; } }

@@ -133,7 +133,7 @@ export class ExpoSqliteCrewRepository implements CrewLinkRepository {
   private async validateSchema(database: SQLiteDatabase): Promise<void> {
     const version = await database.getFirstAsync<{ user_version: number }>('PRAGMA user_version');
     if (Number(version?.user_version) !== LATEST_CREWLINK_SCHEMA_VERSION) throw new CrewDatabaseMigrationError('invalid_schema');
-    const required = new Set(['crew_peer', 'crew_group', 'crew_membership', 'crew_share_policy', 'crew_position', 'crew_latest_position', 'crew_inbound_dedup', 'crew_outbox', 'crew_delivery_observation', 'crew_ack', 'crew_transport_status', 'crew_migration_log', 'crew_local_metadata']);
+    const required = new Set(['crew_peer', 'crew_group', 'crew_membership', 'crew_share_policy', 'crew_position', 'crew_latest_position', 'crew_inbound_dedup', 'crew_outbox', 'crew_delivery_observation', 'crew_ack', 'crew_transport_status', 'crew_migration_log', 'crew_local_metadata', 'crew_identity', 'crew_trusted_peer', 'crew_pairing_invitation']);
     const found = await database.getAllAsync<{ name: string }>("SELECT name FROM sqlite_master WHERE type = 'table'");
     if ([...required].some((name) => !found.some((table) => table.name === name))) throw new CrewDatabaseMigrationError('invalid_schema');
   }

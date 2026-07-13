@@ -11,7 +11,8 @@
     "packages/offline-packs",
     "packages/gpx",
     "packages/crew-protocol",
-    "packages/crewlink"
+    "packages/crewlink",
+    "packages/crew-identity"
   ],
   "scripts": {
     "start": "npm --workspace apps/mobile run start",

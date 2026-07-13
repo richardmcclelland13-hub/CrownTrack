@@ -5,3 +5,9 @@ dist-baseline
 artifacts/stage-2-visual-qa
 coverage
 *.log
+*.apk
+*.db
+*.db-wal
+*.db-shm
+*.keystore
+*.jks

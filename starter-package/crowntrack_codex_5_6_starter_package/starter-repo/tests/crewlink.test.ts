@@ -50,12 +50,12 @@ const allow = async (coordinator: CrewLinkCoordinator, enabled = true, precision
 
 test('migration export is forward-only and transaction-wrapped', () => {
   assert.equal(CREWLINK_MIGRATIONS[0].version, 1);
-  assert.equal(LATEST_CREWLINK_SCHEMA_VERSION, 3);
+  assert.equal(LATEST_CREWLINK_SCHEMA_VERSION, 5);
   assert.deepEqual(migrationTransactionSql(CREWLINK_MIGRATIONS[0]).slice(0, 1), ['BEGIN IMMEDIATE']);
   const statements = migrationTransactionSql(CREWLINK_MIGRATIONS[0]);
   assert.equal(statements[statements.length - 1], 'COMMIT');
   assert.equal(statements.some((statement) => statement.includes('journal_mode')), false);
-  assert.deepEqual(pendingMigrations(1).map((migration) => migration.version), [2, 3]);
+  assert.deepEqual(pendingMigrations(1).map((migration) => migration.version), [2, 3, 4, 5]);
   assert.throws(() => validateMigrationPlan([{ version: 2, name: 'broken', statements: ['SELECT 1'] }]));
 });
 
