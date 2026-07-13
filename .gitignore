@@ -1,0 +1,6 @@
+# Local Expo prebuild output and native build products
+starter-package/crowntrack_codex_5_6_starter_package/starter-repo/apps/mobile/android/
+starter-package/crowntrack_codex_5_6_starter_package/starter-repo/apps/mobile/**/build/
+
+# Local native QA evidence may contain device database snapshots or build logs
+starter-package/crowntrack_codex_5_6_starter_package/starter-repo/artifacts/stage-2-2-native-qa/
