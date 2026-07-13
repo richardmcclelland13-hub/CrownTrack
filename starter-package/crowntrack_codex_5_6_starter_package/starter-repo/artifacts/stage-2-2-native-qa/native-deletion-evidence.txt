@@ -1,0 +1,8 @@
+Stage 2.2 native deletion evidence
+Device: emulator-5554
+Confirmed deletion database query:
+crew_group=0
+crew_share_policy=0
+crew_outbox=0
+crew_peer=0
+After force-stop/relaunch, Crew UI: NO RIDE GROUP

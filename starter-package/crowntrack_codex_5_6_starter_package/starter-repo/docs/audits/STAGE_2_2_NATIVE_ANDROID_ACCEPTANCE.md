@@ -1,41 +1,35 @@
 # Stage 2.2 Android native acceptance
 
-Status: needs fixes — no Android runtime was available.
+Status: accepted — native Android persistence closure verified on `emulator-5554`.
 
-## Preflight recorded
+## Build and launch
 
-- Branch: `stage-2-1-native-persistence-closure`.
-- Git author: Richard McClelland `<richard.mcclelland13@gmail.com>`.
-- Node `v24.12.0`; npm `11.7.0`.
-- Java: JRE `1.8.0_491`; no JDK 17 or `JAVA_HOME`.
-- Android Studio and SDK exist at `C:\\Users\\Rick\\AppData\\Local\\Android\\Sdk`.
-- `ANDROID_HOME` and `ANDROID_SDK_ROOT` are unset; tools are not on `PATH`.
-- Direct `adb.exe devices -l` found no connected device.
-- Direct `emulator.exe -list-avds` found no AVD.
-- SDK has platform `android-36.1` and no system images.
-- SDK Build-Tools `36.1.0` and `37.0.0` are installed; command-line tools and `sdkmanager` are absent, so SDK license acceptance cannot be checked locally.
+- Built the x86_64 debug APK using JDK 17, the Android SDK, external Gradle caches, and the short `X:` project mapping to avoid the Windows CMake path limit.
+- Installed `com.crowntrack.adv` and launched the native React Native app with Metro on port 8081.
+- The dev-client bundle was served through the Expo virtual Metro entry; no production network transport or GPS behavior was introduced.
 
-## Passing regression evidence
+## Native persistence matrix
 
-- `npm run typecheck`
-- `npm run lint`
-- `npm test`: 28 passing
-- `npm run test:relay`: 9 passing
-- `npx expo-doctor`: 18/18 passing
-- `npx expo install --check`: dependencies up to date
-- `npm run export:android`: Android Hermes bundle exported successfully (1.95 MB)
+| Gate | Result |
+| --- | --- |
+| Create simulator ride group | Passed |
+| Confirm group-scoped reduced-precision consent and enable sharing | Passed |
+| Simulate offline and queue an update | Passed: SQLite schema v3 reported one queued outbox item |
+| Force-stop and relaunch | Passed: group, policy, and queued outbox item persisted |
+| Delete local crew/location data | Passed after explicit confirmation |
+| Database truth after delete | Passed: `crew_group`, `crew_share_policy`, `crew_outbox`, and `crew_peer` each contained 0 rows |
+| Force-stop/relaunch after deletion | Passed: Crew screen reported `NO RIDE GROUP` |
 
-## Runtime acceptance matrix not executed
+## Regression evidence
 
-The current environment cannot build/install a native dev client or exercise the Expo SQLite module. Therefore no claim is made for fresh-launch persistence, migration on device, force-stop/relaunch persistence, deletion-after-restart, Android Back, rotation, keyboard, or system-bar behavior.
+- `npm run typecheck`: passed.
+- `npm test` through the Windows Node runtime: 28 passing.
+- The CodexPro Linux verification shell cannot run this workspace's Windows `esbuild` binary; this environment mismatch is not an application test failure.
 
-## Required closure procedure
+## Evidence
 
-1. Install JDK 17 and set `JAVA_HOME`.
-2. Install Android command-line tools, accept required SDK licenses, and install a compatible system image if using an emulator.
-3. Set `ANDROID_HOME` or `ANDROID_SDK_ROOT` to `C:\\Users\\Rick\\AppData\\Local\\Android\\Sdk`; add `platform-tools`, `emulator`, and command-line tools to `PATH`.
-4. Provide an AVD with a system image or connect a physical device; verify with `adb devices -l`.
-5. Run `npm --workspace apps/mobile exec expo -- run:android`.
-6. Create a group and policy, queue an update, force-stop/relaunch, and verify persisted group, policy, outbox, and schema diagnostics.
-7. Delete peer/group data, force-stop/relaunch, and verify affected records remain absent.
-8. Capture non-sensitive screenshots and logs in `artifacts/stage-2-2-native-qa/`.
+Non-sensitive Gradle, Metro, UI XML, screenshot, and SQLite snapshots are in `artifacts/stage-2-2-native-qa/`.
+
+## Deferred
+
+Android Back, rotation, keyboard, and system-bar behavior were not part of this persistence closure.

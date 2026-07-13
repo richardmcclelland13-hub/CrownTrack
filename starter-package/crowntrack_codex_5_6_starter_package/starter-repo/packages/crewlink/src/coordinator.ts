@@ -6,6 +6,7 @@ import type {
 import type { CrewRepository } from './repository';
 import type { CrewTransport, Unsubscribe } from './transport';
 import { DEFAULT_RETRY_POLICY, retryDelayMs, type RetryPolicy } from './retry';
+import { clone } from './clone';
 
 export class ConsentRequiredError extends Error {
   constructor(readonly gate: 'create' | 'enqueue' | 'retry') { super(`Location sharing consent required at ${gate}`); }
@@ -38,7 +39,7 @@ export class CrewLinkCoordinator {
   async start(localPeer: PeerIdentity, rideGroupIds: string[]) {
     await this.repo.initialize();
     await this.repo.pruneExpired(this.nowIso());
-    this.localPeer = structuredClone(localPeer);
+    this.localPeer = clone(localPeer);
     for (const transport of this.transports) {
       this.subscriptions.push(
         transport.subscribe((envelope) => this.receive(envelope, transport.kind)),
@@ -68,7 +69,7 @@ export class CrewLinkCoordinator {
     const sentAt = this.nowIso();
     const message = parseCrewLinkMessage({
       version: CREW_LINK_VERSION, type: 'location', messageId: this.ids.next(), groupId, deviceId: sender.deviceId,
-      streamId, sequence, sentAt, ttlSeconds, payload: structuredClone(fix),
+      streamId, sequence, sentAt, ttlSeconds, payload: clone(fix),
     }, { expectedGroupId: groupId, now: this.clock.now(), maxFutureSkewMs: this.futureSkewMs });
     if (message.type !== 'location') throw new Error('Expected a location message');
     return policy.precision === 'reduced' ? reduceLocationPrecision(message) : message;
@@ -76,7 +77,7 @@ export class CrewLinkCoordinator {
   async enqueue(ownerPeerId: string, envelope: LocationEnvelope) {
     await this.requireConsent(ownerPeerId, envelope.groupId, 'enqueue');
     this.validateLocation(envelope, envelope.groupId);
-    await this.repo.enqueue({ envelope: structuredClone(envelope), ownerPeerId, state: 'queued', attempts: 0, nextAttemptAt: this.nowIso(), sentVia: [] });
+    await this.repo.enqueue({ envelope: clone(envelope), ownerPeerId, state: 'queued', attempts: 0, nextAttemptAt: this.nowIso(), sentVia: [] });
   }
   async createAndEnqueue(sender: PeerIdentity, groupId: string, streamId: string, sequence: number, fix: LocationFix, ttlSeconds: number) {
     const envelope = await this.createLocationEnvelope(sender, groupId, streamId, sequence, fix, ttlSeconds);
