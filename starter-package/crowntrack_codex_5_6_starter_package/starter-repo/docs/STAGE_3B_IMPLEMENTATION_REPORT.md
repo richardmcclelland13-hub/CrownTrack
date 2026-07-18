@@ -1,7 +1,7 @@
 # Stage 3B implementation report
 
 - Date: 2026-07-18
-- Status: Blocked pending Android native and visual acceptance
+- Status: Needs fixes — recovery checkpoint pending remaining Android native and visual acceptance
 
 ## Delivered and verified
 
@@ -14,4 +14,4 @@
 
 ## Acceptance evidence
 
-Windows PowerShell results: typecheck passed; unit tests 73/73; relay tests 13/13; lint passed; Android export passed (641 modules, 2.3 MB Hermes bundle); Expo Doctor 18/18; Expo install check up to date. Direct ADB/UIAutomator reproduced the reciprocal-trust failure and its sanitized Hermes `structuredClone` error. The signed in-memory repository/harness now reuse the portable clone fallback, and a focused no-`structuredClone` test proves reciprocal trust plus epoch-2 grant. A fresh local release build bundles current source but cannot finish its Expo/Gradle monorepo embed pass because it resolves `index.js` from the repository root. No repaired native acceptance, screenshot, database inspection, or acceptance commit is claimed.
+Windows PowerShell results: typecheck passed; unit tests 74/74; relay tests 13/13; lint passed; Android export passed (641 modules, 2.3 MB Hermes bundle); Expo Doctor 18/18; Expo install check up to date. Direct ADB/UIAutomator reproduced the Hermes clone error, then verified the portable-clone fix. It also exposed and repaired a fresh-harness trust-gate error: persisted matching pairing state now rehydrates local trust before reciprocal epoch-2 grant. Current device evidence covers membership, policy/outbox/valid ACK, inbound/duplicate/tamper, forged ACK, revocation/stale epoch, and complete deletion/two relaunches. The fresh Android build/install did not complete within the bounded Gradle run; Map/missing-key, short-TTL reconstruction, and full visual/accessibility evidence remain outstanding. No acceptance claim is made; see `STAGE_3B_03R_RECOVERY_CHECKPOINT.md`.

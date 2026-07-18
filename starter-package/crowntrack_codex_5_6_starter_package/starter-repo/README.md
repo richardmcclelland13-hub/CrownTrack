@@ -37,7 +37,7 @@ The tabs are Map, Packs, Plan, Crew, and SOS. Native Android/iOS builds use Expo
 - Reset and complete deletion clear local identity/trust/pairing and scoped CrewLink state. Recipient devices and backups may retain data previously delivered.
 - Cloud, nearby, and mesh are simulated delivery pipes; they are untrusted and do not make a position current. The in-process rider is not a physical phone.
 
-Stage 3B Android runtime acceptance is currently blocked by the local Windows capture layer, despite an available `emulator-5554`; see `docs/audits/STAGE_3B_ANDROID_NATIVE_QA.md`. iOS runtime is unverified.
+Direct ADB/UIAutomator on `emulator-5554` verified repaired signed membership, delivery/adversarial, and deletion paths. Stage 3B is still unaccepted: a bounded fresh Android build/install did not complete, and the remaining Map/missing-key, short-TTL reconstruction, and 360/390/412/768 visual/accessibility matrices are outstanding; see `docs/STAGE_3B_03R_RECOVERY_CHECKPOINT.md`. iOS runtime is unverified.
 
 ## Native Android development
 

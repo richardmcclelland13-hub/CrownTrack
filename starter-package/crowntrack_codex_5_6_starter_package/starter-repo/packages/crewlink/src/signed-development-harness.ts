@@ -120,6 +120,8 @@ export class SignedDevelopmentHarness {
   async start(groupId = 'development-ride') {
     this.groupId = groupId;
     if (this.localRepository instanceof HarnessRepository) await this.localRepository.upsertTrustedDevice({ deviceId: this.local.deviceId, publicKey: this.local.signer.publicKey });
+    const persistedPairing = await this.localRepository.getTrustedDevice(this.remote.deviceId);
+    this.localTrust = Boolean((await this.pairingConfirmed()) && persistedPairing && !persistedPairing.revokedAt && persistedPairing.publicKey === this.remote.signer.publicKey);
     await this.localCoordinator.start(); await this.remoteCoordinator.start();
     for (const t of [this.localCloud, this.localNearby, this.localMesh, this.remoteCloud, this.remoteNearby, this.remoteMesh]) await t.startSigned([groupId]);
     await this.setAllTransportsOffline();
@@ -250,7 +252,7 @@ export class SignedDevelopmentHarness {
       duplicateObservationCount: duplicateCount, lastRejectionCategory: this.lastRejectionCategory ?? latestRejection?.reason ?? 'none',
       latestLocation: latest && { exists: true, ageMs: ageMs ?? 0, freshness: lastKnownRevoked ? 'stale' : freshness, transport: latestObservedAt ? latestObservations[latestObservations.length - 1]?.transport ?? 'unknown' : 'unknown', lastKnownRevoked },
       diagnostics: { groups: exported.groups.length, memberships: exported.memberships.length, tombstones: exported.tombstones.length, acknowledgements: exported.acknowledgements.length, locations: exported.locations.length },
-      capabilities: { canDeliverDuplicate: Boolean(this.latestInboundCandidate) && this.localNearby.getState() === 'connected' && !lastKnownRevoked, canRunForgedAck: Boolean(this.secondOutbound), canRunTamper: Boolean(this.latestInboundCandidate), canRevoke: remote?.status === 'active', canDeliverOldEpoch: Boolean(this.latestInboundCandidate && lastKnownRevoked), canReconstruct: Boolean(group), canDeleteSignedState: Boolean(group) },
+      capabilities: { canDeliverDuplicate: Boolean(this.latestInboundCandidate) && !lastKnownRevoked, canRunForgedAck: Boolean(this.secondOutbound), canRunTamper: Boolean(this.latestInboundCandidate), canRevoke: remote?.status === 'active', canDeliverOldEpoch: Boolean(this.latestInboundCandidate && lastKnownRevoked), canReconstruct: Boolean(group), canDeleteSignedState: Boolean(group) },
     };
   }
 }

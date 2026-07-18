@@ -46,9 +46,30 @@ test('reciprocal trust and grant work when the native runtime lacks structuredCl
   await harness.stop();
 });
 
+test('fresh runtime restores confirmed local trust before reciprocal grant', async () => {
+  const local = createDeterministicHarnessIdentity(Uint8Array.from({ length: 32 }, (_, i) => i + 1), 'rehydrated-trust-local', 'Rehydrated Trust Local');
+  const initial = new SignedDevelopmentHarness({ local, ids: { next: () => `rehydrated-initial-${Date.now()}` }, localPairingConfirmed: async () => true });
+  await initial.start();
+  await initial.createLocalGroup();
+  await initial.refreshConfirmedLocalPairing();
+  await initial.stop();
+
+  const reconstructed = new SignedDevelopmentHarness({ local, localRepository: initial.localRepository, ids: { next: () => `rehydrated-reconstructed-${Date.now()}` }, localPairingConfirmed: async () => true });
+  await reconstructed.start();
+  assert.equal((await reconstructed.safeSnapshot()).localPairingConfirmed, true);
+  await reconstructed.confirmReciprocalDevelopmentTrust();
+  await reconstructed.grantRemote();
+  const safe = await reconstructed.safeSnapshot();
+  assert.equal(safe.group?.epoch, 2);
+  assert.equal(safe.remoteMembership, 'active');
+  await reconstructed.stop();
+});
+
 test('signed harness accepts a remote buddy location locally and records a nearby duplicate', async () => {
   const harness = await makeHarness();
   await harness.deliverRemoteBuddyLocation({ ...fix, capturedAt: new Date().toISOString() }, 'cloud');
+  assert.equal(harness.localNearby.getState(), 'unavailable');
+  assert.equal((await harness.safeSnapshot()).capabilities.canDeliverDuplicate, true, 'the UI handler establishes nearby transport before delivery');
   await harness.setTransportAvailable('cloud', false); await harness.setTransportAvailable('nearby', true);
   await harness.deliverDuplicateViaNearby();
   const latest = (await harness.localRepository.listSignedLatestPositions('development-ride')).find(x => x.senderDeviceId === harness.remote.deviceId);
@@ -60,6 +81,7 @@ test('signed harness accepts a remote buddy location locally and records a nearb
   const safe = await harness.safeSnapshot();
   assert.equal(safe.latestLocation?.transport, 'nearby');
   assert.equal(safe.lastInboundOutcome, 'accepted');
+  assert.equal(safe.capabilities.canDeliverDuplicate, true);
   await harness.stop();
 });
 
