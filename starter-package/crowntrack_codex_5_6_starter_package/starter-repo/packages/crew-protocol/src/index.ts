@@ -1,4 +1,5 @@
 import { z } from 'zod';
+export * from './signed';
 
 export const CREW_LINK_VERSION = 1 as const;
 export const DEFAULT_TTL_SECONDS = 120;

@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased — Stage 3B: Signed membership and messages (blocked native acceptance)
+
+- Added strict signed-v2 membership, epoch, tombstone, replay, sequence, TTL, and retry-time authorization handling.
+- Corrected the development product flow so local outbound ACK/outbox state is independent from a locally persisted, accepted inbound development-rider position.
+- Added runtime-time capture timestamps, safe signed presentation, confirmations, action gates, missing-key/crypto controls, manual pairing cleanup, truthful Map metadata, and expanded adversarial/reconstruction coverage.
+- Windows verification passed with 67 unit tests and 13 relay tests; Android export passed. Acceptance remains blocked pending native emulator interaction and sanitized visual evidence.
+
 ## Unreleased — Stage 3A: Secure device identity and offline pairing
 
 - Added explicit persistent Ed25519 device identity backed by Expo SecureStore private-seed storage and SQLite public metadata.

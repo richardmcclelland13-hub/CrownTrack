@@ -12,6 +12,9 @@ test('reads namespaced environment configuration and keeps loopback defaults', (
   assert.equal(config.host, '127.0.0.1');
   assert.equal(config.port, 9898);
   assert.equal(config.devToken, TOKEN);
+  assert.equal(config.allowLegacyV1, false);
+  assert.equal(configFromEnv({ NODE_ENV: 'test', CREWLINK_DEV_TOKEN: TOKEN, CREWLINK_RELAY_ALLOW_LEGACY_V1: 'true' }).allowLegacyV1, true);
+  assert.throws(() => configFromEnv({ NODE_ENV: 'test', CREWLINK_DEV_TOKEN: TOKEN, CREWLINK_RELAY_ALLOW_LEGACY_V1: 'yes' }), /exactly/);
 });
 
 afterEach(async () => {
@@ -63,7 +66,7 @@ const join = async (socket: WebSocket, rideGroupId = 'ride-1', peerId = 'rider-a
   return response;
 };
 
-const locationEnvelope = (groupId = 'ride-1', senderPeerId = 'rider-a') => {
+const legacyLocationEnvelope = (groupId = 'ride-1', senderPeerId = 'rider-a') => {
   const sentAt = new Date(Date.now() - 1_000).toISOString();
   return {
   version: 1,
@@ -77,6 +80,32 @@ const locationEnvelope = (groupId = 'ride-1', senderPeerId = 'rider-a') => {
   ttlSeconds: 120,
   payload: { latitude: 39.7392, longitude: -104.9903, capturedAt: sentAt },
   } as const;
+};
+
+type SignedType = 'location' | 'ack' | 'membership_grant' | 'membership_revocation';
+
+const signedEnvelope = (type: SignedType, groupId = 'ride-1', senderDeviceId = 'rider-a') => {
+  const sentAt = new Date(Date.now() - 1_000).toISOString();
+  const base = {
+    version: 2,
+    domain: 'crowntrack-crewlink-signed/v1',
+    messageId: `message-${senderDeviceId}-${type}`,
+    groupId,
+    senderDeviceId,
+    signerPublicKey: 'a'.repeat(43),
+    streamId: `stream-${senderDeviceId}`,
+    sequence: 1,
+    membershipEpoch: 1,
+    sentAt,
+    ttlSeconds: 120,
+    signature: 'b'.repeat(86),
+  } as const;
+  switch (type) {
+    case 'location': return { ...base, type, payload: { latitude: 39.7392, longitude: -104.9903, capturedAt: sentAt } };
+    case 'ack': return { ...base, type, payload: { acknowledgedMessageId: 'message-a', receivedAt: sentAt, status: 'received' } };
+    case 'membership_grant': return { ...base, type, payload: { member: { deviceId: 'rider-c', publicKey: 'c'.repeat(43), displayName: 'Rider C' }, grantedEpoch: 2 } };
+    case 'membership_revocation': return { ...base, type, payload: { memberDeviceId: 'rider-c', memberPublicKey: 'c'.repeat(43), revokedEpoch: 2 } };
+  }
 };
 
 test('accepts a valid token and room join', async () => {
@@ -103,8 +132,45 @@ test('rejects malformed join groups and location envelopes for another group', a
   const socket = await connect(relay.url);
   await join(socket);
   const response = nextJson(socket);
-  socket.send(JSON.stringify(locationEnvelope('ride-2')));
+  socket.send(JSON.stringify(signedEnvelope('location', 'ride-2')));
   assert.deepEqual(await response, { type: 'error', code: 'invalid_request' });
+});
+
+test('rejects signed-v2 envelopes whose sender does not match the joined peer', async () => {
+  const relay = await start();
+  const socket = await connect(relay.url);
+  await join(socket, 'ride-1', 'rider-a');
+  const response = nextJson(socket);
+  socket.send(JSON.stringify(signedEnvelope('location', 'ride-1', 'rider-b')));
+  assert.deepEqual(await response, { type: 'error', code: 'invalid_request' });
+});
+
+test('rejects malformed signed-v2 frames before forwarding', async () => {
+  const relay = await start();
+  const socket = await connect(relay.url);
+  await join(socket);
+  const response = nextJson(socket);
+  socket.send(JSON.stringify({ ...signedEnvelope('location'), signature: 'too-short' }));
+  assert.deepEqual(await response, { type: 'error', code: 'invalid_request' });
+});
+
+test('rejects legacy-v1 by default and accepts it only with the explicit compatibility switch', async () => {
+  const defaultRelay = await start();
+  const defaultSocket = await connect(defaultRelay.url);
+  await join(defaultSocket);
+  const rejected = nextJson(defaultSocket);
+  defaultSocket.send(JSON.stringify(legacyLocationEnvelope()));
+  assert.deepEqual(await rejected, { type: 'error', code: 'invalid_request' });
+
+  const compatibleRelay = await start({ allowLegacyV1: true });
+  const riderA = await connect(compatibleRelay.url);
+  const riderB = await connect(compatibleRelay.url);
+  await join(riderA, 'ride-1', 'rider-a');
+  await join(riderB, 'ride-1', 'rider-b');
+  const received = nextJson(riderB);
+  const frame = legacyLocationEnvelope();
+  riderA.send(JSON.stringify(frame));
+  assert.deepEqual(await received, frame);
 });
 
 test('rejects malformed JSON and closes the socket', async () => {
@@ -131,7 +197,7 @@ test('rate limits each socket independently', async () => {
   const socket = await connect(relay.url);
   await join(socket);
   const closed = event<unknown[]>(socket, 'close');
-  const message = locationEnvelope();
+  const message = signedEnvelope('location');
   socket.send(JSON.stringify(message));
   socket.send(JSON.stringify(message));
   const close = await closed;
@@ -150,15 +216,30 @@ test('removes disconnected clients and permits reconnect with the same identity'
   assert.deepEqual(await join(second, 'ride-1', 'rider-a'), { type: 'joined', rideGroupId: 'ride-1' });
 });
 
-test('relays a validated location between two clients in the same room', async () => {
+test('relays each strict signed-v2 envelope type between two clients in the same room', async () => {
   const relay = await start();
   const riderA = await connect(relay.url);
   const riderB = await connect(relay.url);
   await join(riderA, 'ride-1', 'rider-a');
   await join(riderB, 'ride-1', 'rider-b');
 
+  for (const type of ['location', 'ack', 'membership_grant', 'membership_revocation'] as const) {
+    const received = nextJson(riderB);
+    const frame = signedEnvelope(type);
+    riderA.send(JSON.stringify(frame));
+    assert.deepEqual(await received, frame);
+  }
+});
+
+test('forwards a shape-valid envelope with a tampered signature without making an auth decision', async () => {
+  const relay = await start();
+  const riderA = await connect(relay.url);
+  const riderB = await connect(relay.url);
+  await join(riderA, 'ride-1', 'rider-a');
+  await join(riderB, 'ride-1', 'rider-b');
+
+  const frame = { ...signedEnvelope('location'), signature: 'z'.repeat(86) };
   const received = nextJson(riderB);
-  const frame = locationEnvelope();
   riderA.send(JSON.stringify(frame));
   assert.deepEqual(await received, frame);
 });

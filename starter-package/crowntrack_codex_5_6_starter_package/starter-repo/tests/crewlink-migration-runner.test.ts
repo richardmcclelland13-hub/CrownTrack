@@ -30,23 +30,23 @@ test('migration runner upgrades an empty database, is idempotent, and configures
   assert.equal(driver.configured, true);
   assert.equal(first.fromVersion, 0);
   assert.equal(first.toVersion, LATEST_CREWLINK_SCHEMA_VERSION);
-  assert.deepEqual(driver.recorded, [1, 2, 3, 4, 5]);
+  assert.deepEqual(driver.recorded, [1, 2, 3, 4, 5, 6, 7, 8, 9]);
   const second = await runCrewLinkMigrations(driver, () => '2026-07-12T00:00:00.000Z');
   assert.equal(second.applied.length, 0);
 });
 
-test('migration v5 survives a restart without being applied twice', async () => {
+test('migration v5-to-v9 survives a restart without being applied twice', async () => {
   const driver = new FakeMigrationDriver();
   driver.version = 4;
   driver.recorded = [1, 2, 3, 4];
 
   const first = await runCrewLinkMigrations(driver, () => '2026-07-12T00:00:00.000Z');
-  assert.deepEqual(first.applied.map((migration) => migration.version), [5]);
-  assert.deepEqual(driver.recorded, [1, 2, 3, 4, 5]);
+  assert.deepEqual(first.applied.map((migration) => migration.version), [5, 6, 7, 8, 9]);
+  assert.deepEqual(driver.recorded, [1, 2, 3, 4, 5, 6, 7, 8, 9]);
 
   const restarted = await runCrewLinkMigrations(driver, () => '2026-07-12T00:01:00.000Z');
   assert.equal(restarted.applied.length, 0);
-  assert.deepEqual(driver.recorded, [1, 2, 3, 4, 5]);
+  assert.deepEqual(driver.recorded, [1, 2, 3, 4, 5, 6, 7, 8, 9]);
 });
 
 test('migration runner preserves the prior version when a migration is interrupted', async () => {

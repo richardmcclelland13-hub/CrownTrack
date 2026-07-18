@@ -1,7 +1,8 @@
 import * as SecureStore from 'expo-secure-store';
 import * as Crypto from 'expo-crypto';
-import { base64UrlToBytes, bytesToBase64Url, createPairingInvitation, createPublicIdentity, derivePublicKey, pairingAuthenticationCode, resolveIdentityStorageStatus, signBytes, trustedPeerFromInvitation, verifyBytes, verifyPairingInvitation, type PairingInvitation, type PublicDeviceIdentity, type TrustedPeer } from '@crowntrack/crew-identity';
+import { base64UrlToBytes, bytesToBase64Url, createPairingInvitation, createPublicIdentity, derivePublicKey, pairingAuthenticationCode, resolveIdentityStorageStatus, signBytes, trustedPeerFromInvitation, verifyBytes, verifyPairingInvitation, type CanonicalSigner, type PairingInvitation, type PublicDeviceIdentity, type TrustedPeer } from '@crowntrack/crew-identity';
 import { ExpoSqliteCrewRepository } from './repository';
+import { createDevelopmentRiderInvitation, DEVELOPMENT_RIDER_SEED } from './development-rider';
 
 const SEED_KEY = 'crowntrack.crew.identity.seed.v1';
 const DATABASE_NAME = 'crowntrack-crew.db';
@@ -57,12 +58,32 @@ export const createNativeIdentity = async (): Promise<NativeIdentityState> => {
 };
 
 export const resetNativeIdentity = async (): Promise<void> => {
-  await SecureStore.deleteItemAsync(SEED_KEY);
-  try { const database = await initialize(); await database.withExclusiveTransactionAsync(async (tx) => tx.execAsync('DELETE FROM crew_pairing_invitation; DELETE FROM crew_trusted_peer; DELETE FROM crew_identity')); }
-  catch { throw new Error('Secure key was removed but local identity cleanup failed; reset must be retried.'); }
+  // The database removal is one transaction; deleting the SecureStore seed is deliberately last so a failed database cleanup remains recoverable.
+  try {
+    const database = await initialize();
+    await database.withExclusiveTransactionAsync(async (tx) => tx.execAsync([
+      'DELETE FROM crew_verified_group', 'DELETE FROM crew_pairing_invitation', 'DELETE FROM crew_trusted_peer',
+      'DELETE FROM crew_identity', 'DELETE FROM crew_message_rejection',
+    ].join('; ')));
+  } catch { throw new Error('Local identity/trust cleanup failed; the secure key was retained so reset can be retried.'); }
+  try { await SecureStore.deleteItemAsync(SEED_KEY); }
+  catch { throw new Error('Identity records were removed but the secure key remains; reset must be retried.'); }
 };
 
 const validShape = (value: unknown): value is PairingInvitation => Boolean(value) && typeof value === 'object' && typeof (value as PairingInvitation).invitationId === 'string' && typeof (value as PairingInvitation).signature === 'string' && typeof (value as PairingInvitation).issuer?.publicKey === 'string' && typeof (value as PairingInvitation).expiresAt === 'string';
+
+/** A signing capability only: private seed bytes never cross this module boundary. */
+export const nativeCanonicalSigner = async (): Promise<CanonicalSigner> => {
+  const { identity } = await requireSeed();
+  return {
+    publicKey: identity.publicKey,
+    sign: async (bytes) => {
+      const current = await requireSeed();
+      if (current.identity.publicKey !== identity.publicKey) throw new Error('Identity changed while signing.');
+      return bytesToBase64Url(signBytes(current.seed, bytes));
+    },
+  };
+};
 
 export const createNativePairingInvitation = async (): Promise<PairingInvitation> => {
   const { seed, identity } = await requireSeed(); const issuedAt = now(); const nonce = bytesToBase64Url(Uint8Array.from(await Crypto.getRandomBytesAsync(16)));
@@ -101,8 +122,12 @@ export const listNativeTrustedPeers = async (): Promise<TrustedPeer[]> => { cons
 export const createDevelopmentPairingScenario = async (scenario: 'valid' | 'expired' | 'tampered' | 'malformed' | 'replacement'): Promise<unknown> => {
   if (!__DEV__) throw new Error('Development pairing simulation is unavailable.');
   if (scenario === 'malformed') return { version: 1, type: 'development-malformed' };
+  if (scenario === 'valid') {
+    const issuedAt = now(); const nonce = bytesToBase64Url(Uint8Array.from(await Crypto.getRandomBytesAsync(16)));
+    return createDevelopmentRiderInvitation({ invitationId: 'dev-invite-' + nonce.slice(0, 18), issuedAt, expiresAt: new Date(Date.now() + 10 * 60_000).toISOString(), nonce });
+  }
   // Fixed development-only seeds let the local simulator represent the same fake rider across reloads. They are not production identity material.
-  const seed = Uint8Array.from({ length: 32 }, (_, index) => scenario === 'replacement' ? 255 - index : index + 1);
+  const seed = scenario === 'replacement' ? Uint8Array.from({ length: 32 }, (_, index) => 255 - index) : DEVELOPMENT_RIDER_SEED;
   const issuedAt = scenario === 'expired' ? new Date(Date.now() - 20 * 60_000).toISOString() : now();
   const identity = createPublicIdentity(seed, { deviceId: 'development-second-rider', displayName: scenario === 'replacement' ? 'Development Rider — replacement key' : 'Development Rider With A Deliberately Long Display Name', createdAt: issuedAt });
   const nonce = bytesToBase64Url(Uint8Array.from(await Crypto.getRandomBytesAsync(16)));

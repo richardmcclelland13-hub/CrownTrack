@@ -48,3 +48,7 @@ export const sharingOffPolicy: LocationSharePolicy = {
   retentionMinutes: 120,
   emergencyOverride: false,
 };
+/**
+ * Legacy pre-signed CrewLink compatibility types. The Stage 3B signed-native
+ * path uses `signedCrewPresentation.ts` and does not import this module.
+ */

@@ -5,6 +5,7 @@
   "main": "src/index.ts",
   "types": "src/index.ts",
   "dependencies": {
-    "@crowntrack/crew-protocol": "0.1.0"
+    "@crowntrack/crew-protocol": "0.1.0",
+    "@crowntrack/crew-identity": "0.1.0"
   }
 }

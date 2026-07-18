@@ -1,140 +1,34 @@
-import React, { useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
-import { colors, FieldCard, Panel, PrimaryButton, Screen, SecondaryButton, SectionHeader, StatusChip } from '@crowntrack/ui';
-import type { TabKey } from '../screens';
+import React, { useEffect, useState } from 'react';
+import { BackHandler, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { colors, FieldCard, PrimaryButton, Screen, SecondaryButton, StatusChip } from '@crowntrack/ui';
 import type { CrewDevelopmentModel } from './useCrewDevelopment';
-import type { CrewPeer, PresenceState, TransportStatus } from './types';
+import type { TabKey } from '../screens';
 
-type UiTone = 'ready' | 'info' | 'warning' | 'danger' | 'unknown';
-const toneForPresence = (presence: PresenceState): UiTone => presence === 'live' ? 'ready' : presence === 'recent' ? 'info' : presence === 'stale' ? 'warning' : 'unknown';
-const toneForLink = (state: string): UiTone => state === 'connected' ? 'ready' : state === 'degraded' || state === 'connecting' ? 'warning' : 'unknown';
-const sourceLabel = (source?: string) => source ? source.replace('_', ' ') : 'none';
+const Action = ({ label, onPress, disabled, reason }: { label: string; onPress: () => void; disabled?: boolean; reason?: string }) => <View style={styles.action}><SecondaryButton onPress={onPress} disabled={disabled}>{label}</SecondaryButton>{disabled && reason ? <Text style={styles.reason}>{reason}</Text> : null}</View>;
+const Confirmation = ({ title, copy, confirm, cancel, confirmLabel }: { title: string; copy: string; confirm: () => void; cancel: () => void; confirmLabel: string }) => <View style={styles.confirmation}><Text style={styles.confirmTitle}>{title}</Text><Text style={styles.body}>{copy}</Text><PrimaryButton onPress={confirm}>{confirmLabel}</PrimaryButton><SecondaryButton onPress={cancel}>Cancel</SecondaryButton></View>;
 
-const Choice = ({ label, selected, onPress }: { label: string; selected: boolean; onPress: () => void }) => (
-  <Pressable accessibilityRole="radio" accessibilityState={{ checked: selected }} onPress={onPress} style={({ pressed }) => [styles.choice, selected && styles.choiceSelected, pressed && styles.pressed]}>
-    <Text style={[styles.choiceText, selected && styles.choiceTextSelected]}>{label}</Text>
-  </Pressable>
-);
-
-const DangerButton = ({ children, onPress }: { children: React.ReactNode; onPress: () => void }) => (
-  <Pressable accessibilityRole="button" onPress={onPress} style={({ pressed }) => [styles.dangerButton, pressed && styles.pressed]}><Text style={styles.dangerButtonText}>{children}</Text></Pressable>
-);
-
-const TransportRow = ({ status }: { status: TransportStatus }) => (
-  <View style={styles.rowBetween}>
-    <View style={styles.flex}>
-      <Text style={styles.cardTitleSmall}>{status.label}</Text>
-      <Text style={styles.body}>{status.kind === 'mesh_radio' ? 'External hardware path' : status.kind === 'nearby' ? 'Phone-to-phone development path' : 'Internet relay development path'}</Text>
-    </View>
-    <StatusChip label={status.state.toUpperCase()} tone={toneForLink(status.state)} />
-  </View>
-);
-
-const BuddyCard = ({ peer, onPresence, onRevoke }: { peer: CrewPeer; onPresence: (state: PresenceState) => void; onRevoke: () => void }) => {
-  if (peer.revoked) return <FieldCard style={styles.revokedCard}><View style={styles.rowBetween}><View style={styles.flex}><Text style={styles.cardTitleSmall}>{peer.displayName}</Text><Text style={styles.body}>Removed locally · sharing trust revoked</Text></View><StatusChip label="REVOKED" tone="danger" /></View></FieldCard>;
-  return <FieldCard>
-    <View style={styles.rowBetween}><View style={styles.flex}><Text style={styles.cardTitle}>{peer.displayName}</Text><Text style={styles.body}>{peer.vehicle}</Text></View><StatusChip label={peer.presence.toUpperCase()} tone={toneForPresence(peer.presence)} /></View>
-    <Text style={styles.freshness}>Last update: {peer.ageLabel} · source: {sourceLabel(peer.source)}</Text>
-    <Text style={styles.body}>{peer.presence === 'live' ? 'A recent remote position was received.' : peer.presence === 'recent' ? 'Position is aging; do not treat it as live.' : peer.presence === 'stale' ? 'Last known position only; rider may have moved.' : 'No usable buddy position is available.'}</Text>
-    <View style={styles.scenarioRow}>
-      {(['live', 'recent', 'stale', 'unknown'] as const).map((presence) => <Choice key={presence} label={presence} selected={peer.presence === presence} onPress={() => onPresence(presence)} />)}
-    </View>
-    <SecondaryButton accessibilityLabel={`Remove and revoke ${peer.displayName}`} onPress={onRevoke}>Remove / revoke peer</SecondaryButton>
-  </FieldCard>;
-};
-
-export const CrewDevelopmentScreen = ({ onTab, crew }: { onTab: (tab: TabKey) => void; crew: CrewDevelopmentModel }) => {
-  const { snapshot } = crew;
-  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
-  const [showIdentityResetConfirm, setShowIdentityResetConfirm] = useState(false);
-  const [invitationText, setInvitationText] = useState('');
-  const activePeers = snapshot.peers.filter((peer) => !peer.revoked).length;
-  return <Screen><ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
-    <View style={styles.header}><View style={styles.headerCopy}><Text style={styles.kicker}>CROWNTRACK ADV</Text><Text style={styles.title}>CrewLink</Text></View><StatusChip label="DEVELOPMENT SIMULATOR" tone="unknown" /></View>
-
-    <SectionHeader eyebrow="SECURE IDENTITY" title="My device" />
-    <FieldCard>
-      <View style={styles.rowBetween}><View style={styles.flex}><Text style={styles.cardTitleSmall}>{crew.identityState.status === 'ready' ? `Ready · ${crew.identityState.identity?.fingerprint.slice(0, 14)}…` : crew.identityState.status.replaceAll('_', ' ')}</Text><Text style={styles.body}>Created: {crew.identityState.identity ? new Date(crew.identityState.identity.createdAt).toLocaleDateString() : 'Not created'} · Provider: {crew.identityState.provider}</Text><Text style={styles.body}>Private signing material stays in secure storage. Pairing authenticates identity and integrity; it does not encrypt locations.</Text></View><StatusChip label={crew.identityState.status.toUpperCase().replaceAll('_', ' ')} tone={crew.identityState.status === 'ready' ? 'ready' : 'warning'} /></View>
-      {crew.identityState.status === 'not_created' ? <PrimaryButton onPress={crew.createIdentity}>Create identity</PrimaryButton> : !showIdentityResetConfirm ? <SecondaryButton onPress={() => setShowIdentityResetConfirm(true)}>Reset identity and trust</SecondaryButton> : <View style={styles.confirmBox}><Text style={styles.dangerText}>Reset this identity and revoke all local trust? This cannot be undone.</Text><View style={styles.choiceRow}><SecondaryButton onPress={() => setShowIdentityResetConfirm(false)}>Cancel</SecondaryButton><DangerButton onPress={() => { setShowIdentityResetConfirm(false); crew.resetIdentity(); }}>Confirm reset</DangerButton></View></View>}
-    </FieldCard>
-
-    <SectionHeader eyebrow="OFFLINE PAIRING" title="Add friend" />
-    <FieldCard>
-      <Text style={styles.body}>Create a signed invitation for the system share sheet, or paste an invitation received out of band. Complete payloads are concealed here.</Text>
-      <SecondaryButton onPress={crew.shareInvitation}>Create signed invitation</SecondaryButton><Text style={styles.limitText}>Use Copy in the Android or iOS system share sheet to copy the concealed invitation.</Text>
-      <TextInput accessibilityLabel="Paste CrownTrack pairing invitation" autoCapitalize="none" autoCorrect={false} secureTextEntry value={invitationText} onChangeText={setInvitationText} placeholder="Paste invitation" placeholderTextColor={colors.textTertiary} style={styles.input} />
-      <PrimaryButton disabled={!invitationText} accessibilityState={{ disabled: !invitationText }} onPress={() => { crew.importInvitation(invitationText); setInvitationText(''); }}>Validate invitation</PrimaryButton>
-      {crew.pendingPairing ? <View style={styles.pendingCard}><StatusChip label="PENDING VERIFICATION" tone="warning" /><Text style={styles.cardTitleSmall}>{crew.pendingPairing.displayName}</Text><Text style={styles.body}>Signature verified. Compare this code with your friend in person:</Text><Text accessibilityLabel={`Authentication code ${crew.pendingPairing.code}`} style={styles.authCode}>{crew.pendingPairing.code}</Text><Text style={styles.body}>Matching codes do not auto-confirm trust.</Text><View style={styles.choiceRow}><SecondaryButton onPress={crew.cancelPairing}>Cancel</SecondaryButton><PrimaryButton onPress={crew.confirmPairing}>Confirm pairing</PrimaryButton></View></View> : null}
-    </FieldCard>
-
-    <SectionHeader eyebrow="IDENTITY TRUST" title="Trusted friends" action={`${crew.trustedPeers.filter((peer) => !peer.revokedAt).length} verified`} />
-    {crew.trustedPeers.length ? crew.trustedPeers.map((peer) => <FieldCard key={peer.deviceId}><View style={styles.rowBetween}><View style={styles.flex}><Text style={styles.cardTitleSmall}>{peer.displayName}</Text><Text style={styles.body}>Fingerprint {peer.fingerprint.slice(0, 14)}… · {peer.revokedAt ? 'Revoked locally' : 'Signature and comparison code verified'}</Text></View><StatusChip label={peer.revokedAt ? 'REVOKED' : 'VERIFIED'} tone={peer.revokedAt ? 'danger' : 'ready'} /></View>{!peer.revokedAt ? <SecondaryButton onPress={() => crew.revokeTrustedPeer(peer.deviceId)}>Revoke trusted friend</SecondaryButton> : null}</FieldCard>) : <FieldCard><Text style={styles.body}>No trusted friends. Validating an invitation alone never creates trust.</Text></FieldCard>}
-
-    <Panel>
-      <View style={styles.rowBetween}><View style={styles.flex}><Text style={styles.cardEyebrow}>DEVELOPMENT-ONLY PAIRING</Text><Text style={styles.cardTitleSmall}>Local second-rider simulator</Text></View><StatusChip label="NOT A PHYSICAL PHONE" tone="unknown" /></View>
-      <Text style={styles.body}>Exercises identity failures locally. It does not represent a second device, radio, or network.</Text>
-      <View style={styles.scenarioRow}>{(['valid', 'expired', 'tampered', 'malformed', 'replay', 'replacement'] as const).map((scenario) => <Choice key={scenario} label={scenario} selected={false} onPress={() => crew.runDevelopmentPairingScenario(scenario)} />)}</View>
-      {crew.identityState.status === 'ready' ? <SecondaryButton onPress={crew.simulateMissingPrivateKey}>Simulate missing private key</SecondaryButton> : null}
-      <Text accessibilityLiveRegion="polite" style={styles.actionStatus}>{crew.lastAction}</Text>
-    </Panel>
-
-    {!snapshot.group ? <FieldCard style={styles.attentionCard}>
-      <View style={styles.rowBetween}><View style={styles.flex}><Text style={styles.cardEyebrow}>NO RIDE GROUP</Text><Text style={styles.cardTitle}>Crew sharing is inactive</Text></View><StatusChip label="SHARING OFF" tone="unknown" /></View>
-      <Text style={styles.body}>Create a local development group to exercise consent, transport, freshness, and revocation states. Nothing leaves this device.</Text>
-      <PrimaryButton onPress={crew.createGroup}>Create simulator ride group</PrimaryButton>
-    </FieldCard> : <FieldCard>
-      <View style={styles.rowBetween}><View style={styles.flex}><Text style={styles.cardEyebrow}>CURRENT RIDE GROUP</Text><Text style={styles.cardTitle}>{snapshot.group.name}</Text></View><StatusChip label={`${activePeers} PEERS`} tone="info" /></View>
-      <Text style={styles.body}>Local development group · ID {snapshot.group.id}</Text>
-    </FieldCard>}
-
-    {snapshot.group ? <>
-      <SectionHeader eyebrow="EXPLICIT CONSENT" title="Location sharing" action={snapshot.policy.enabled ? 'On' : 'Off'} />
-      <FieldCard style={snapshot.policy.enabled ? styles.sharingCard : undefined}>
-        <View style={styles.rowBetween}><View style={styles.flex}><Text style={styles.cardTitle}>{snapshot.policy.enabled ? 'Sharing on' : 'Sharing off'}</Text><Text style={styles.body}>Applies only to {snapshot.group.name}.</Text></View><StatusChip label={snapshot.policy.enabled ? 'ON' : 'OFF'} tone={snapshot.policy.enabled ? 'ready' : 'unknown'} /></View>
-        <Text style={styles.label}>Precision shared</Text>
-        <View style={styles.choiceRow}><Choice label="Reduced" selected={snapshot.policy.precision === 'reduced'} onPress={() => crew.setPolicy({ precision: 'reduced' })} /><Choice label="Exact" selected={snapshot.policy.precision === 'exact'} onPress={() => crew.setPolicy({ precision: 'exact' })} /></View>
-        <Text style={styles.label}>Local retention</Text>
-        <View style={styles.choiceRow}><Choice label="30 minutes" selected={snapshot.policy.retentionMinutes === 30} onPress={() => crew.setPolicy({ retentionMinutes: 30 })} /><Choice label="2 hours" selected={snapshot.policy.retentionMinutes === 120} onPress={() => crew.setPolicy({ retentionMinutes: 120 })} /></View>
-        <Pressable accessibilityRole="checkbox" accessibilityState={{ checked: snapshot.consentConfirmed }} onPress={crew.confirmConsent} style={({ pressed }) => [styles.consentRow, snapshot.consentConfirmed && styles.consentRowSelected, pressed && styles.pressed]}>
-          <View style={[styles.checkbox, snapshot.consentConfirmed && styles.checkboxSelected]}><Text style={styles.checkmark}>{snapshot.consentConfirmed ? '✓' : ''}</Text></View>
-          <Text style={styles.consentText}>I consent to share {snapshot.policy.precision} location with this group and retain it locally for {snapshot.policy.retentionMinutes} minutes.</Text>
-        </Pressable>
-        {snapshot.policy.enabled ? <SecondaryButton onPress={() => crew.setSharing(false)}>Turn sharing off and revoke</SecondaryButton> : <PrimaryButton disabled={!snapshot.consentConfirmed} accessibilityState={{ disabled: !snapshot.consentConfirmed }} onPress={() => crew.setSharing(true)}>Turn sharing on</PrimaryButton>}
-        <Text style={styles.limitText}>Emergency override is off. This simulator does not acquire GPS or transmit data.</Text>
-      </FieldCard>
-
-      <SectionHeader eyebrow="TRANSPORT SUMMARY" title="How updates could move" action={`${snapshot.queuedOutbox} queued`} />
-      <FieldCard>{snapshot.transports.map((status) => <TransportRow key={status.kind} status={status} />)}{snapshot.queuedOutbox > 0 ? <Text style={styles.queueText}>{snapshot.queuedOutbox} outbound location update queued locally. Reconnecting an enabled simulator clears this development queue.</Text> : null}</FieldCard>
-
-      <SectionHeader eyebrow="BUDDY STATUS" title="Freshness and source" />
-      {snapshot.peers.map((peer) => <BuddyCard key={peer.peerId} peer={peer} onPresence={(presence) => crew.setPeerPresence(peer.peerId, presence)} onRevoke={() => crew.revokePeer(peer.peerId)} />)}
-
-      <Panel>
-        <View style={styles.rowBetween}><View style={styles.flex}><Text style={styles.cardEyebrow}>DEVELOPER PANEL</Text><Text style={styles.cardTitle}>Simulated transports only</Text></View><StatusChip label="SIMULATOR" tone="unknown" /></View>
-        <Text style={styles.body}>These controls do not use a real network, Bluetooth, nearby radios, GPS, or background services.</Text>
-        <Text style={styles.label}>Cloud relay simulator</Text>
-        <View style={styles.choiceRow}><Choice label="Connected" selected={snapshot.transports[0].state === 'connected'} onPress={() => crew.setTransport('cloud', 'connected')} /><Choice label="Unavailable" selected={snapshot.transports[0].state === 'unavailable'} onPress={() => crew.setTransport('cloud', 'unavailable')} /></View>
-        <Text style={styles.label}>Nearby-phone simulator</Text>
-        <View style={styles.choiceRow}><Choice label="Available" selected={snapshot.transports[1].state === 'connected'} onPress={() => crew.setTransport('nearby', 'connected')} /><Choice label="Unavailable" selected={snapshot.transports[1].state === 'unavailable'} onPress={() => crew.setTransport('nearby', 'unavailable')} /></View>
-        <View style={styles.hardwareNotice}><Text style={styles.cardTitleSmall}>Mesh radio not paired</Text><Text style={styles.body}>Compatible external mesh hardware is required for a real connection. No hardware or range is claimed here.</Text></View>
-        <View style={styles.choiceRow}><Choice label="Sim connected" selected={snapshot.transports[2].state === 'connected'} onPress={() => crew.setTransport('mesh_radio', 'connected')} /><Choice label="Not paired" selected={snapshot.transports[2].state === 'unavailable'} onPress={() => crew.setTransport('mesh_radio', 'unavailable')} /></View>
-        <SecondaryButton onPress={crew.runCryptoProof}>Run native identity crypto proof</SecondaryButton>
-        <SecondaryButton onPress={crew.setAllOfflineAndQueue}>Simulate offline + queue update</SecondaryButton>
-        <Text accessibilityLiveRegion="polite" style={styles.actionStatus}>{crew.lastAction}</Text>
-        {snapshot.diagnostics ? <Text style={styles.limitText}>Storage: {snapshot.diagnostics.adapter} · schema v{snapshot.diagnostics.schemaVersion} · queue {snapshot.diagnostics.rowCounts.outbox ?? 0}. No coordinates or secrets are shown.</Text> : null}
-      </Panel>
-
-      <FieldCard style={styles.deleteCard}>
-        <Text style={styles.cardTitleSmall}>Local crew and location data</Text>
-        <Text style={styles.body}>Deletes this group, consent, peers, latest/history positions, acknowledgements, transport state, queued updates, device identity, pairing invitations and local trust from this device.</Text>
-        {!showDeleteConfirm ? <SecondaryButton onPress={() => setShowDeleteConfirm(true)}>Delete local crew/location data</SecondaryButton> : <View style={styles.confirmBox}><Text accessibilityLiveRegion="polite" style={styles.dangerText}>Delete all local CrewLink data? This cannot be undone.</Text><View style={styles.choiceRow}><SecondaryButton onPress={() => setShowDeleteConfirm(false)}>Cancel</SecondaryButton><DangerButton onPress={() => { setShowDeleteConfirm(false); void crew.deleteAll(); }}>Confirm delete</DangerButton></View></View>}
-      </FieldCard>
-    </> : null}
-
-    <Panel><Text style={styles.cardTitleSmall}>Safety boundary</Text><Text style={styles.body}>A connected transport is not proof that a buddy position is live. Always use the freshness age and source text.</Text><SecondaryButton onPress={() => onTab('Map')}>View buddy on map</SecondaryButton><SecondaryButton onPress={() => onTab('SOS')}>Open rescue tools</SecondaryButton></Panel>
+export const CrewDevelopmentScreen = ({ crew }: { onTab: (tab: TabKey) => void; crew: CrewDevelopmentModel }) => {
+  const [confirmReset, setConfirmReset] = useState(false);
+  const [confirmRevoke, setConfirmRevoke] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const [manualOpen, setManualOpen] = useState(false);
+  const [manualInvitation, setManualInvitation] = useState('');
+  const clearTransient = () => { setConfirmReset(false); setConfirmRevoke(false); setConfirmDelete(false); setManualOpen(false); setManualInvitation(''); crew.cancelPairing(); };
+  useEffect(() => { const subscription = BackHandler.addEventListener('hardwareBackPress', () => { if (confirmReset || confirmRevoke || confirmDelete || manualOpen || crew.pendingPairing) { clearTransient(); return true; } return false; }); return () => subscription.remove(); }, [confirmReset, confirmRevoke, confirmDelete, manualOpen, crew.pendingPairing]);
+  const view = crew.presentation; const gates = view?.actionGates;
+  return <Screen><ScrollView contentContainerStyle={styles.scroll} accessibilityLiveRegion="polite" keyboardShouldPersistTaps="handled">
+    <Text style={styles.title}>Signed CrewLink</Text>
+    <Text style={styles.notice}>Signed messages prove origin and integrity. Location content is not encrypted in this stage.</Text>
+    <Text style={styles.body}>Pairing and trust do not authorize group membership. In-process development rider — not a physical phone. Cloud, nearby, and mesh are simulated transports. Connected does not mean a position is current. Delivery is not guaranteed. CrewLink is not emergency or satellite communication.</Text>
+    <FieldCard><Text style={styles.heading}>Device identity</Text><StatusChip label={crew.identityState.status.replaceAll('_', ' ').toUpperCase()} tone={crew.identityState.status === 'ready' ? 'ready' : 'unknown'} />{view ? <Text style={styles.body}>Short fingerprint: {view.localFingerprint}</Text> : null}{crew.identityState.status === 'not_created' ? <PrimaryButton onPress={crew.createIdentity}>Create identity</PrimaryButton> : null}{crew.identityState.status === 'ready' ? (confirmReset ? <Confirmation title="Reset device identity?" copy="This stops the signed runtime and clears this device’s identity, private-key storage, pairing invitations, trusted peers, groups, memberships, tombstones, policies, queued updates, locations, ACKs, observations, and rejections." confirm={() => { crew.resetIdentity(); clearTransient(); }} cancel={clearTransient} confirmLabel="Confirm identity reset" /> : <SecondaryButton onPress={() => setConfirmReset(true)}>Reset identity</SecondaryButton>) : null}{crew.identityState.status !== 'ready' && crew.identityState.status !== 'not_created' ? <Text style={styles.warning}>Recovery/reset required. No identity or private key will be silently regenerated.</Text> : null}</FieldCard>
+    <FieldCard><Text style={styles.heading}>Trust and membership</Text><Text style={styles.body}>Group: {view?.group?.exists ? `${view.group.origin} · epoch ${view.group.epoch} · ${view.group.owner ? 'owner' : 'member'}` : 'not created'}{`\n`}Pairing: {view?.localPairingConfirmed ? 'confirmed' : 'not confirmed'} · reciprocal development trust: {view?.reciprocalTrust ? 'confirmed' : 'not confirmed'}{`\n`}Development rider: {view?.membership ?? 'unauthorized'}{view?.tombstonePresent ? ' · terminal Stage 3B tombstone' : ''}</Text>{crew.pendingPairing ? <View style={styles.pairing}><Text style={styles.body}>Verification succeeded. Matching this code does not create trust or membership.</Text><Text selectable style={styles.code}>{crew.pendingPairing.code}</Text><PrimaryButton onPress={() => { crew.confirmPairing(); setManualInvitation(''); }}>Confirm pairing code</PrimaryButton><SecondaryButton onPress={clearTransient}>Cancel pairing</SecondaryButton></View> : <><Action label="Stage deterministic development-rider invitation" onPress={crew.stageDevelopmentPairing} /><SecondaryButton onPress={() => setManualOpen(!manualOpen)}>{manualOpen ? 'Hide manual invitation tool' : 'Manual invitation import (development)'}</SecondaryButton>{manualOpen ? <View style={styles.manual}><Text style={styles.body}>Concealed development tool. The raw invitation is cleared after stage, cancel, error, Back, reset, or deletion.</Text><TextInput secureTextEntry value={manualInvitation} onChangeText={setManualInvitation} placeholder="Paste invitation" placeholderTextColor={colors.textTertiary} style={styles.input} accessibilityLabel="Manual pairing invitation" /><PrimaryButton onPress={() => { crew.stageManualPairing(manualInvitation); setManualInvitation(''); setManualOpen(false); }}>Stage manual invitation</PrimaryButton></View> : null}</>}<Action label="Confirm reciprocal development trust" onPress={crew.confirmReciprocalTrust} disabled={crew.identityState.status !== 'ready'} reason="A ready local identity is required." /><Action label="Create verified group" onPress={crew.createGroup} disabled={crew.identityState.status !== 'ready'} reason="A ready local identity is required." /><Action label="Grant group membership" onPress={crew.grantRider} disabled={!gates?.grant.enabled} reason={gates?.grant.reason} /></FieldCard>
+    <FieldCard><Text style={styles.heading}>Sharing consent</Text><Text style={styles.body}>Precision: {view?.policy.precision ?? 'reduced'} · retention: {view?.policy.retentionMinutes ?? 0} min{`\n`}Consent: {view?.policy.consentConfirmed ? 'confirmed' : 'not confirmed'} · sharing: {view?.policy.sharingEnabled ? 'enabled' : 'off'}</Text><Action label="Configure reduced precision and 15-minute retention" onPress={crew.configureReduced} /><Action label="Confirm consent" onPress={crew.confirmConsent} /><Action label="Enable sharing" onPress={() => crew.setSharing(true)} disabled={!gates?.sharing.enabled} reason={gates?.sharing.reason} /><Action label="Disable sharing" onPress={() => crew.setSharing(false)} /><Action label="Revoke consent and purge queued updates" onPress={crew.revokeConsent} /></FieldCard>
+    <FieldCard><Text style={styles.heading}>Signed delivery</Text><Text style={styles.body}>Local outbound outbox: {view?.outbox.count ?? 0} ({view?.outbox.state ?? 'empty'}) · local ACK: {view?.lastAckOutcome ?? 'none'}{`\n`}Inbound buddy outcome: {view?.lastInboundOutcome ?? 'none'} · duplicate observations: {view?.duplicateObservationCount ?? 0}{`\n`}Cloud: {view?.transports.cloud ?? 'unavailable'} · Nearby: {view?.transports.nearby ?? 'unavailable'} · Mesh: {view?.transports.mesh_radio ?? 'unavailable'}</Text><Action label="Set all transports offline" onPress={crew.offline} /><Action label="Queue local outbound signed update" onPress={crew.queue} disabled={!gates?.queue.enabled} reason={gates?.queue.reason} /><Action label="Connect cloud and flush local outbox" onPress={crew.flushCloud} /><Action label="Deliver signed development-rider inbound update" onPress={crew.deliverBuddy} disabled={!gates?.inbound.enabled} reason={gates?.inbound.reason} /><Action label="Connect nearby and deliver inbound duplicate" onPress={crew.duplicate} disabled={!gates?.duplicate.enabled} reason={gates?.duplicate.reason} /></FieldCard>
+    <FieldCard><Text style={styles.heading}>Security scenarios</Text><Text style={styles.body}>Latest rejected category: {view?.lastRejectionCategory ?? 'none'}</Text><Action label="Queue/run forged ACK" onPress={crew.forgedAck} disabled={!gates?.forgedAck.enabled} reason={gates?.forgedAck.reason} /><Action label="Run tampered inbound-location scenario" onPress={crew.tamper} disabled={!gates?.tamper.enabled} reason={gates?.tamper.reason} />{confirmRevoke ? <Confirmation title="Revoke development-rider membership?" copy="This advances the group epoch and creates a terminal Stage 3B tombstone for this exact development-rider identity. It cannot be granted again in this stage; retained position becomes last-known only." confirm={() => { crew.revoke(); clearTransient(); }} cancel={clearTransient} confirmLabel="Confirm revocation" /> : <Action label="Revoke membership" onPress={() => setConfirmRevoke(true)} disabled={!gates?.revoke.enabled} reason={gates?.revoke.reason} />}<Action label="Deliver delayed old-epoch location" onPress={crew.oldEpoch} disabled={!gates?.oldEpoch.enabled} reason={gates?.oldEpoch.reason} /></FieldCard>
+    <FieldCard><Text style={styles.heading}>Storage, reload, deletion</Text><Text style={styles.body}>Safe diagnostics: {view ? `${view.diagnostics.groups} groups · ${view.diagnostics.memberships} memberships · ${view.diagnostics.tombstones} tombstones · ${view.diagnostics.acknowledgements} ACKs · ${view.diagnostics.locations} positions` : 'unavailable'}</Text><Action label="Full runtime recreation from local storage" onPress={crew.reload} disabled={!gates?.reload.enabled} reason={gates?.reload.reason} /><Action label="Simulate missing private key" onPress={crew.simulateMissingKey} disabled={crew.identityState.status !== 'ready'} reason="A ready identity is required." /><Action label="Run native cryptography proof" onPress={crew.cryptoProof} disabled={crew.identityState.status !== 'ready'} reason="A ready identity is required." />{confirmDelete ? <Confirmation title="Complete local deletion?" copy="Deletes this device’s identity, private-key storage, pairing invitations, trusted peers, groups, memberships, tombstones, policies, queued updates, locations, ACKs, observations, and rejections. Recipient devices and backups may retain copies already delivered." confirm={() => { crew.deleteAll(); clearTransient(); }} cancel={clearTransient} confirmLabel="Confirm complete local deletion" /> : <Action label="Complete local deletion" onPress={() => setConfirmDelete(true)} disabled={!gates?.delete.enabled} reason={gates?.delete.reason} />}</FieldCard>
+    <FieldCard><Text style={styles.heading}>Buddy safety summary</Text><Text style={styles.body}>{view?.summary ?? 'No usable buddy position'}{view?.freshness ? ` · source ${view.freshness.transport}` : ''}</Text><SecondaryButton onPress={() => undefined}>Map buddy details are shown on Map</SecondaryButton></FieldCard>
+    <Text style={styles.status}>{crew.lastAction}</Text>
   </ScrollView></Screen>;
 };
 
-const styles = StyleSheet.create({
-  scroll: { gap: 14, paddingBottom: 32 }, header: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'center', gap: 10, marginBottom: 2 }, headerCopy: { flexGrow: 1, minWidth: 180 }, kicker: { color: colors.textTertiary, fontSize: 11, fontWeight: '900', letterSpacing: 1.4 }, title: { color: colors.textPrimary, fontSize: 26, fontWeight: '900', marginTop: 3 }, rowBetween: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', gap: 10 }, flex: { flex: 1, minWidth: 0, gap: 3 }, cardEyebrow: { color: colors.textTertiary, fontSize: 11, fontWeight: '900', letterSpacing: 1, textTransform: 'uppercase' }, cardTitle: { color: colors.textPrimary, fontSize: 18, fontWeight: '900', marginTop: 3 }, cardTitleSmall: { color: colors.textPrimary, fontSize: 14, fontWeight: '800' }, body: { color: colors.textSecondary, fontSize: 14, lineHeight: 20 }, freshness: { color: colors.textPrimary, fontSize: 14, fontWeight: '800', lineHeight: 20 }, label: { color: colors.textPrimary, fontSize: 13, fontWeight: '800' }, choiceRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 }, scenarioRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 }, choice: { minHeight: 48, minWidth: 76, flexGrow: 1, borderRadius: 12, borderWidth: 1, borderColor: colors.border, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 12 }, choiceSelected: { borderColor: colors.gps, backgroundColor: colors.surfacePressed }, choiceText: { color: colors.textSecondary, fontSize: 13, fontWeight: '800', textTransform: 'capitalize' }, choiceTextSelected: { color: colors.textPrimary }, consentRow: { minHeight: 64, borderWidth: 1, borderColor: colors.border, borderRadius: 14, padding: 12, flexDirection: 'row', alignItems: 'center', gap: 12 }, consentRowSelected: { borderColor: colors.trail, backgroundColor: colors.surfacePressed }, checkbox: { width: 28, height: 28, borderRadius: 7, borderWidth: 2, borderColor: colors.textTertiary, alignItems: 'center', justifyContent: 'center' }, checkboxSelected: { borderColor: colors.trail, backgroundColor: colors.trail }, checkmark: { color: colors.background, fontSize: 18, fontWeight: '900' }, consentText: { flex: 1, color: colors.textPrimary, fontSize: 14, lineHeight: 20, fontWeight: '700' }, sharingCard: { borderColor: colors.trail }, attentionCard: { borderColor: colors.warning }, revokedCard: { opacity: 0.8 }, queueText: { color: colors.warning, fontSize: 14, lineHeight: 20, fontWeight: '800' }, limitText: { color: colors.textTertiary, fontSize: 12, lineHeight: 18 }, hardwareNotice: { borderLeftWidth: 3, borderLeftColor: colors.warning, paddingLeft: 12, gap: 4 }, actionStatus: { color: colors.gps, fontSize: 13, lineHeight: 19, fontWeight: '700' }, deleteCard: { borderColor: '#6B3D39' }, confirmBox: { gap: 12, padding: 12, borderRadius: 12, backgroundColor: '#241917' }, dangerText: { color: colors.danger, fontWeight: '800', lineHeight: 20 }, dangerButton: { minHeight: 48, flexGrow: 1, borderRadius: 14, borderWidth: 1, borderColor: colors.danger, backgroundColor: '#3A1D1A', alignItems: 'center', justifyContent: 'center', paddingHorizontal: 16 }, dangerButtonText: { color: colors.textPrimary, fontSize: 15, fontWeight: '900' }, input: { minHeight: 52, borderWidth: 1, borderColor: colors.border, borderRadius: 12, paddingHorizontal: 14, color: colors.textPrimary, backgroundColor: colors.surfacePressed }, pendingCard: { gap: 10, borderWidth: 1, borderColor: colors.warning, borderRadius: 12, padding: 12 }, authCode: { color: colors.textPrimary, fontSize: 30, lineHeight: 38, fontWeight: '900', letterSpacing: 6, textAlign: 'center' }, pressed: { opacity: 0.72 },
-});
+const styles = StyleSheet.create({ scroll: { gap: 14, paddingBottom: 28 }, title: { color: colors.textPrimary, fontSize: 28, fontWeight: '900' }, heading: { color: colors.textPrimary, fontSize: 18, fontWeight: '900' }, body: { color: colors.textSecondary, lineHeight: 20 }, notice: { color: colors.warning, fontWeight: '900', lineHeight: 21 }, action: { gap: 4 }, reason: { color: colors.textTertiary, fontSize: 12, lineHeight: 17 }, code: { color: colors.textPrimary, fontSize: 28, fontWeight: '900', textAlign: 'center', letterSpacing: 5, paddingVertical: 12 }, status: { color: colors.gps, fontWeight: '700', lineHeight: 20 }, warning: { color: colors.warning, fontWeight: '800', lineHeight: 20 }, pairing: { gap: 10, marginTop: 8 }, manual: { gap: 10, marginTop: 8 }, input: { minHeight: 48, borderWidth: 1, borderColor: colors.border, borderRadius: 10, color: colors.textPrimary, paddingHorizontal: 12, paddingVertical: 10 }, confirmation: { gap: 10, padding: 12, borderWidth: 1, borderColor: colors.warning, borderRadius: 12, marginTop: 8 }, confirmTitle: { color: colors.textPrimary, fontWeight: '900', fontSize: 16 } });

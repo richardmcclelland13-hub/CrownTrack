@@ -8,3 +8,8 @@ export const verifyBytes = (publicKey: Uint8Array, payload: Uint8Array, signatur
 export const publicKeyFromSeed = (seed: Uint8Array): string => bytesToBase64Url(derivePublicKey(seed));
 export const signBase64Url = (seed: Uint8Array, payload: Uint8Array): string => bytesToBase64Url(signBytes(seed, payload));
 export const verifyBase64Url = (publicKey: string, payload: Uint8Array, signature: string): boolean => { try { return verifyBytes(base64UrlToBytes(publicKey), payload, base64UrlToBytes(signature)); } catch { return false; } };
+
+/** A narrow capability: callers submit bytes and never receive private seed material. */
+export interface CanonicalSigner { readonly publicKey: string; sign(bytes: Uint8Array): Promise<string>; }
+/** Test/development helper only. Production callers obtain a signer from the native SecureStore adapter. */
+export const createCanonicalSigner = (seed: Uint8Array): CanonicalSigner => ({ publicKey: publicKeyFromSeed(seed), sign: async (bytes) => signBase64Url(seed, bytes) });
