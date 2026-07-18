@@ -4,6 +4,7 @@ import type { Clock, IdGenerator, LocationFix, StoredSharePolicy, TransportKind 
 import { SignedCrewLinkCoordinator, type SignedCoordinatorRepository } from './signed-coordinator';
 import { InMemorySignedCrewRepository, type SignedOutboxItem } from './signed-repository';
 import { SignedMockCloudTransport, SignedMockMeshRadioTransport, SignedMockNearbyTransport, SignedSimulatedTransportNetwork } from './signed-simulated-transports';
+import { clone } from './clone';
 
 export const DEVELOPMENT_RIDER_LABEL = 'In-process development rider — not a physical phone';
 export const DEVELOPMENT_RIDER = { deviceId: 'development-second-rider', displayName: 'Development Rider With A Deliberately Long Display Name' };
@@ -31,8 +32,8 @@ export type SignedDevelopmentHarnessOptions = {
 /** In-memory adapter adds the retry-time policy check that the native transaction already has. */
 class HarnessRepository extends InMemorySignedCrewRepository implements SignedCoordinatorRepository {
   private readonly policies = new Map<string, StoredSharePolicy>();
-  async getSharePolicy(peerId: string) { const policy = this.policies.get(peerId); return policy && structuredClone(policy); }
-  async putSharePolicy(policy: StoredSharePolicy) { this.policies.set(policy.peerId, structuredClone(policy)); }
+  async getSharePolicy(peerId: string) { const policy = this.policies.get(peerId); return policy && clone(policy); }
+  async putSharePolicy(policy: StoredSharePolicy) { this.policies.set(policy.peerId, clone(policy)); }
   async clearSharePolicy(peerId: string) { this.policies.delete(peerId); }
   async updateSignedOutboxAttempt(item: SignedOutboxItem) {
     const policy = await this.getSharePolicy(item.ownerDeviceId);

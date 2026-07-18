@@ -4,6 +4,7 @@ import {
   type SignedCrewLinkAck, type SignedCrewLinkEnvelope, type SignedCrewLinkLocation,
 } from '@crowntrack/crew-protocol';
 import { verifyBase64Url } from '@crowntrack/crew-identity';
+import { clone } from './clone';
 import type { TransportKind } from './entities';
 import type { TrustedDevice, VerifiedGroup, VerifiedMembership } from './signed-membership';
 
@@ -71,7 +72,6 @@ export interface SignedCrewRepository {
   exportSignedState(): Promise<SignedRepositorySnapshot>;
 }
 
-const clone = <T>(value: T): T => structuredClone(value);
 const memberKey = (groupId: string, deviceId: string) => `${groupId}\u0000${deviceId}`;
 const streamKey = (groupId: string, deviceId: string, streamId: string) => `${groupId}\u0000${deviceId}\u0000${streamId}`;
 const expires = (value: { sentAt: string; ttlSeconds: number }) => signedEnvelopeExpiresAt(value);

@@ -27,6 +27,25 @@ test('signed harness cloud-only happy path and deterministic ACK drain', async (
   await harness.stop();
 });
 
+test('reciprocal trust and grant work when the native runtime lacks structuredClone', async (t) => {
+  const original = globalThis.structuredClone;
+  Object.defineProperty(globalThis, 'structuredClone', { configurable: true, value: undefined, writable: true });
+  t.after(() => Object.defineProperty(globalThis, 'structuredClone', { configurable: true, value: original, writable: true }));
+  const local = createDeterministicHarnessIdentity(Uint8Array.from({ length: 32 }, (_, i) => i + 1), 'native-clone-local', 'Native Clone Local');
+  const harness = new SignedDevelopmentHarness({ local, ids: { next: () => `native-clone-${Date.now()}` }, localPairingConfirmed: async () => true });
+  await harness.start();
+  await harness.createLocalGroup();
+  await harness.refreshConfirmedLocalPairing();
+  assert.equal((await harness.safeSnapshot()).reciprocalTrust, false);
+  await harness.confirmReciprocalDevelopmentTrust();
+  assert.equal((await harness.safeSnapshot()).reciprocalTrust, true);
+  await harness.grantRemote();
+  const safe = await harness.safeSnapshot();
+  assert.equal(safe.group?.epoch, 2);
+  assert.equal(safe.remoteMembership, 'active');
+  await harness.stop();
+});
+
 test('signed harness accepts a remote buddy location locally and records a nearby duplicate', async () => {
   const harness = await makeHarness();
   await harness.deliverRemoteBuddyLocation({ ...fix, capturedAt: new Date().toISOString() }, 'cloud');
